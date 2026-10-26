@@ -1,0 +1,14 @@
+.agents/
+.codex/
+.gitmodules
+.venv/
+.pytest_cache/
+.DS_Store
+.env
+__pycache__/
+*.py[cod]
+AGENTS.md
+DECISION.md
+DECISIONS.md
+PROGRESS.md
+docs/
