@@ -31,6 +31,16 @@ def test_verify_context_thresholds_are_single_source_and_policy_aligned() -> Non
         assert "250" in agents
 
 
+def test_verify_does_not_require_ripgrep_on_ci_runners() -> None:
+    """Prevents GitHub Actions from failing when ripgrep is not preinstalled."""
+    script = VERIFY_SCRIPT.read_text()
+
+    assert "command -v rg" in script
+    assert "grep -Eq" in script
+    assert "find_markdown_tabs()" in script
+    assert "xargs -0 grep -n" in script
+
+
 def _shell_constant(script: str, name: str) -> int:
     matches = re.findall(rf"^{name}=(\d+)$", script, flags=re.MULTILINE)
 

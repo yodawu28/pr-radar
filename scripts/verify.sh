@@ -14,7 +14,19 @@ require_file() {
 require_contains() {
   local path="$1"
   local pattern="$2"
-  rg -q "$pattern" "$path" || fail "$path missing required pattern: $pattern"
+  if command -v rg >/dev/null 2>&1; then
+    rg -q "$pattern" "$path" || fail "$path missing required pattern: $pattern"
+  else
+    grep -Eq "$pattern" "$path" || fail "$path missing required pattern: $pattern"
+  fi
+}
+
+find_markdown_tabs() {
+  if command -v rg >/dev/null 2>&1; then
+    find . -path ./.git -prune -o -path ./.agents -prune -o -path ./.venv -prune -o -path ./.pytest_cache -prune -o -name '*.md' -print0 | xargs -0 rg -n $'\t'
+  else
+    find . -path ./.git -prune -o -path ./.agents -prune -o -path ./.venv -prune -o -path ./.pytest_cache -prune -o -name '*.md' -print0 | xargs -0 grep -n $'\t'
+  fi
 }
 
 MAX_AGENTS_LINES=150
@@ -62,7 +74,7 @@ uv run pytest
 uv run pr-radar --help >/dev/null
 uv run pr-radar scan "https://github.com/example/repo/pull/1" >/dev/null
 
-if find . -path ./.git -prune -o -path ./.agents -prune -o -path ./.venv -prune -o -path ./.pytest_cache -prune -o -name '*.md' -print | xargs rg -n $'\t' >/tmp/pr-radar-tabs.txt; then
+if find_markdown_tabs >/tmp/pr-radar-tabs.txt; then
   cat /tmp/pr-radar-tabs.txt >&2
   fail "markdown files must not contain tab characters"
 fi
