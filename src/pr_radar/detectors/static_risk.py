@@ -2,7 +2,7 @@ import re
 from collections.abc import Callable, Mapping, Sequence
 
 from pr_radar.application.context import ContextEnvelope, build_context_envelope
-from pr_radar.contracts import Finding, PrEvidencePack
+from pr_radar.contracts import BlastRadiusSummary, Finding, PrEvidencePack
 from pr_radar.contracts.base import StrictContract
 from pr_radar.privacy.redaction import redact_text
 
@@ -26,6 +26,7 @@ def run_static_detectors(
     *,
     detectors: Sequence[StaticDetector],
     context_max_chars: int,
+    blast_radius_summary: BlastRadiusSummary | None = None,
 ) -> StaticDetectorResult:
     findings: list[Finding] = []
     detector_ids_by_finding_id: dict[str, str] = {}
@@ -44,6 +45,7 @@ def run_static_detectors(
             detector_id="static",
             detector_ids_by_finding_id=detector_ids_by_finding_id,
             max_chars=context_max_chars,
+            blast_radius_summary=blast_radius_summary,
         ),
     )
 

@@ -4,6 +4,7 @@ from pr_radar.contracts import (
     PrInput,
     PrMetadata,
     RawEvidence,
+    LOW_CONFIDENCE_TAG,
 )
 from pr_radar.detectors.deployment_downtime.migrations import detect_migration_risks
 from pr_radar.detectors.static_risk import run_static_detectors
@@ -122,7 +123,7 @@ def test_migration_detector_flags_ambiguous_high_impact_schema_changes() -> None
     assert finding.calibration_reason == (
         "ambiguous_migration_high_impact_low_confidence"
     )
-    assert finding.tags == ("detector:migration", "low confidence")
+    assert finding.tags == ("detector:migration", LOW_CONFIDENCE_TAG)
 
 
 def test_migration_detector_ignores_safe_additive_migrations() -> None:

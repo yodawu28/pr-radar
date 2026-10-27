@@ -10,6 +10,7 @@
 
 # PR Radar
 
+[![Unit Tests](https://github.com/yodawu28/pr-radar/actions/workflows/unit-tests.yml/badge.svg)](https://github.com/yodawu28/pr-radar/actions/workflows/unit-tests.yml)
 ![Python](https://img.shields.io/badge/python-3.11%2B-3776AB)
 ![uv](https://img.shields.io/badge/package%20manager-uv-4B32C3)
 ![Status](https://img.shields.io/badge/status-Phase%201-blue)
@@ -23,6 +24,29 @@ reports.
 PR Radar is not a nitpick bot. It compresses pull request context into a local
 risk report so a developer can decide whether a PR is safe to approve or needs
 changes.
+
+## What is PR Radar?
+
+PR Radar is a local-first CLI for pull request risk assessment. It focuses on
+high-signal engineering risks that matter during review: AI-generation signals,
+dependency changes, destructive migration clues, test-shape risks, and bounded
+downstream context.
+
+The project is designed around deterministic checks first. Future AI or
+decision-model layers can prioritize and explain findings, but they must not
+override static policy failures or receive raw private source by default.
+
+## Why PR Radar?
+
+General-purpose AI review can be useful, but it often struggles with scope,
+context size, noisy comments, and inconsistent severity. PR Radar takes a more
+constrained approach:
+
+- Deterministic detectors before model judgment.
+- Evidence-backed findings instead of style comments.
+- Report-safe context instead of raw prompt stuffing.
+- Local execution and explicit opt-in for hosted model calls.
+- Human-readable reports that help developers decide, not delegate ownership.
 
 ## Status
 
@@ -61,6 +85,31 @@ GHE_TOKEN=ghp_enterprise_example uv run pr-radar scan \
   https://ghe.example.com/OWNER/REPO/pull/123 \
   --fetch-evidence
 ```
+
+To add source-present downstream context from a local checkout:
+
+```bash
+uv run pr-radar scan https://github.com/OWNER/REPO/pull/123 \
+  --local-workspace-path /path/to/repo
+```
+
+## How It Works
+
+```text
+PR URL
+  -> identity parsing
+  -> optional local evidence fetch
+  -> deterministic risk detectors
+  -> advisory blast-radius context
+  -> bounded context envelope
+  -> local text report
+```
+
+Core boundaries:
+- Raw evidence stays local to fetchers and detectors.
+- Reports render normalized evidence references and redacted excerpts.
+- Blast-radius output is advisory context, not a finding by itself.
+- Contract vocabularies stay stable for future evaluation.
 
 ## Privacy Model
 

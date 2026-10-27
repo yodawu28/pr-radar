@@ -1,6 +1,13 @@
 from importlib import import_module, util
 
-from pr_radar.contracts import EvidenceReference, Finding, RedactedExcerpt
+from pr_radar.contracts import (
+    BlastRadiusBudget,
+    BlastRadiusDependent,
+    BlastRadiusSummary,
+    EvidenceReference,
+    Finding,
+    RedactedExcerpt,
+)
 from pr_radar.scan import scan_pr
 
 
@@ -159,9 +166,51 @@ def test_context_envelope_preserves_excerpts_for_repeated_stable_finding_ids() -
     )
 
 
+def test_context_envelope_carries_blast_radius_advisory_context_raw_free() -> None:
+    """Keeps downstream context available for Sprint 4 without raw source."""
+    context = _context_module()
+    blast_radius_summary = BlastRadiusSummary(
+        availability="available",
+        reason_code="local_workspace_python_imports",
+        changed_paths=("src/service.py",),
+        direct_dependents=(
+            BlastRadiusDependent(
+                changed_path="src/service.py",
+                dependent_path="src/api.py",
+                import_ref="from src.service import Service",
+            ),
+        ),
+        dependent_count=1,
+        budget=BlastRadiusBudget(
+            max_dependents=25,
+            emitted_dependents=1,
+            omitted_dependents=0,
+        ),
+        truncated=False,
+    )
+
+    envelope = context.build_context_envelope(
+        findings=(_dependency_finding(),),
+        detector_id="dependency",
+        max_chars=2_000,
+        blast_radius_summary=blast_radius_summary,
+    )
+
+    assert envelope.blast_radius_summary == blast_radius_summary
+    serialized = str(envelope.model_dump(mode="json"))
+    assert "src/api.py" in serialized
+    assert "from src.service import Service" in serialized
+    assert "PRIVATE_RAW_SOURCE" not in serialized
+    assert "sk_live_1234567890abcdef" not in serialized
+    assert "diff --git" not in serialized
+
+
 def test_parser_only_scan_does_not_claim_review_grade_context() -> None:
     """Parser-only URL handling must stay an identity/smoke path."""
     report = scan_pr("https://github.com/example/repo/pull/17")
 
     assert report.evaluation_metadata["context_grade"] == "parser_only"
     assert report.evaluation_metadata["context_envelope"] == "unavailable"
+    assert report.evaluation_metadata["blast_radius_context_grade"] == "parser_only"
+    assert report.evaluation_metadata["blast_radius_availability"] == "unavailable"
+    assert report.evaluation_metadata["blast_radius_reason_code"] == "parser_only"

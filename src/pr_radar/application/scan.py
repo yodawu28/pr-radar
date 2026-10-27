@@ -1,9 +1,25 @@
 import os
 from collections.abc import Callable, Mapping
+from pathlib import Path
 
 from pr_radar.adapters.github.urllib_http import urllib_http_get
+from pr_radar.application.blast_radius import trace_blast_radius
 from pr_radar.application.context import ContextEnvelope
-from pr_radar.contracts import AiSignalFinding, DecisionStatus, Finding, Report
+from pr_radar.application.scan_metadata import (
+    ContextGrade as ScanContextGrade,
+    ScanEvaluationMetadata,
+)
+from pr_radar.application.scan_policy import DEFAULT_SCAN_POLICY, ScanPolicy
+from pr_radar.contracts import (
+    AiSignalFinding,
+    BlastRadiusBudget,
+    BlastRadiusSummary,
+    DecisionStatus,
+    Finding,
+    LOW_CONFIDENCE_TAG,
+    PrEvidencePack,
+    Report,
+)
 from pr_radar.detectors.ai_signal import detect_ai_signals
 from pr_radar.detectors import get_default_static_detectors
 from pr_radar.detectors.static_risk import run_static_detectors
@@ -15,10 +31,6 @@ from pr_radar.github_adapter import (
 from pr_radar.pull_requests.identity import PrUrlParseError, parse_pr_url
 
 
-_STATIC_CONTEXT_MAX_CHARS = 12_000
-_LOW_CONFIDENCE_TAG = "low confidence"
-
-
 class ScanError(ValueError):
     """Raised when a local PR scan cannot produce a report safely."""
 
@@ -27,6 +39,8 @@ def scan_pr(
     pr_url: str,
     *,
     fetch_evidence: bool = False,
+    local_workspace_path: str | Path | None = None,
+    scan_policy: ScanPolicy = DEFAULT_SCAN_POLICY,
     env: Mapping[str, str] | None = None,
     http_get: Callable[..., GitHubHttpResponse] = urllib_http_get,
 ) -> Report:
@@ -40,10 +54,7 @@ def scan_pr(
             overall_status="safe",
             pr_input=pr_input,
             ai_signal_summary="No AI-generation evidence collected yet.",
-            evaluation_metadata={
-                "context_grade": "parser_only",
-                "context_envelope": "unavailable",
-            },
+            evaluation_metadata=_parser_only_metadata(),
         )
 
     try:
@@ -51,7 +62,7 @@ def scan_pr(
             pr_input,
             env=os.environ if env is None else env,
             http_get=http_get,
-            include_file_contents=True,
+            include_file_contents=scan_policy.include_file_contents,
         )
     except GitHubEvidenceFetchError as error:
         raise ScanError(
@@ -59,10 +70,16 @@ def scan_pr(
         ) from error
 
     ai_signal_findings = detect_ai_signals(evidence_pack)
+    blast_radius_summary = _blast_radius_summary(
+        evidence_pack=evidence_pack,
+        local_workspace_path=local_workspace_path,
+        scan_policy=scan_policy,
+    )
     static_risk_result = run_static_detectors(
         evidence_pack,
         detectors=get_default_static_detectors(),
-        context_max_chars=_STATIC_CONTEXT_MAX_CHARS,
+        context_max_chars=scan_policy.static_context_max_chars,
+        blast_radius_summary=blast_radius_summary,
     )
     return Report(
         overall_status=_overall_status(
@@ -77,6 +94,8 @@ def scan_pr(
         ),
         evaluation_metadata=_context_metadata(
             static_risk_result.context_envelope,
+            blast_radius_summary=blast_radius_summary,
+            local_workspace_path=local_workspace_path,
         ),
     )
 
@@ -125,16 +144,92 @@ def _low_confidence_findings(findings: tuple[Finding, ...]) -> tuple[Finding, ..
     return tuple(
         finding
         for finding in findings
-        if _LOW_CONFIDENCE_TAG in finding.tags
+        if LOW_CONFIDENCE_TAG in finding.tags
     )
 
 
-def _context_metadata(context_envelope: ContextEnvelope) -> dict[str, str]:
-    return {
-        "context_grade": context_envelope.context_grade,
-        "context_envelope": "available",
-        "context_finding_count": str(len(context_envelope.items)),
-        "context_budget_max_chars": str(context_envelope.budget.max_chars),
-        "context_budget_used_chars": str(context_envelope.budget.used_chars),
-        "context_budget_is_over_budget": str(context_envelope.budget.is_over_budget),
-    }
+def _parser_only_metadata() -> dict[str, str]:
+    return ScanEvaluationMetadata(
+        context_grade="parser_only",
+        context_envelope="unavailable",
+        context_finding_count=0,
+        context_budget_max_chars=0,
+        context_budget_used_chars=0,
+        context_budget_is_over_budget=False,
+        blast_radius_context_grade="parser_only",
+        blast_radius_availability="unavailable",
+        blast_radius_reason_code="parser_only",
+        blast_radius_dependent_count=0,
+        blast_radius_truncated=False,
+    ).to_report_metadata()
+
+
+def _blast_radius_summary(
+    *,
+    evidence_pack: PrEvidencePack,
+    local_workspace_path: str | Path | None,
+    scan_policy: ScanPolicy,
+) -> BlastRadiusSummary:
+    changed_paths = tuple(file.path for file in evidence_pack.changed_files)
+    if local_workspace_path is None:
+        return BlastRadiusSummary(
+            availability="unavailable",
+            reason_code="requires_local_workspace",
+            changed_paths=changed_paths,
+            direct_dependents=(),
+            dependent_count=0,
+            budget=BlastRadiusBudget(
+                max_dependents=scan_policy.blast_radius_max_dependents,
+                emitted_dependents=0,
+                omitted_dependents=0,
+            ),
+            truncated=False,
+        )
+
+    return trace_blast_radius(
+        workspace_path=local_workspace_path,
+        changed_paths=changed_paths,
+        max_dependents=scan_policy.blast_radius_max_dependents,
+    )
+
+
+def _context_metadata(
+    context_envelope: ContextEnvelope,
+    *,
+    blast_radius_summary: BlastRadiusSummary,
+    local_workspace_path: str | Path | None,
+) -> dict[str, str]:
+    blast_radius_context_grade = _blast_radius_context_grade(
+        blast_radius_summary=blast_radius_summary,
+        local_workspace_path=local_workspace_path,
+    )
+    return ScanEvaluationMetadata(
+        context_grade=context_envelope.context_grade,
+        context_envelope="available",
+        context_finding_count=len(context_envelope.items),
+        context_budget_max_chars=context_envelope.budget.max_chars,
+        context_budget_used_chars=context_envelope.budget.used_chars,
+        context_budget_is_over_budget=context_envelope.budget.is_over_budget,
+        blast_radius_context_grade=blast_radius_context_grade,
+        blast_radius_availability=blast_radius_summary.availability,
+        blast_radius_reason_code=blast_radius_summary.reason_code,
+        blast_radius_dependent_count=blast_radius_summary.dependent_count,
+        blast_radius_truncated=blast_radius_summary.truncated,
+        blast_radius_changed_paths=blast_radius_summary.changed_paths,
+        blast_radius_direct_dependents=tuple(
+            dependent.dependent_path
+            for dependent in blast_radius_summary.direct_dependents
+        ),
+    ).to_report_metadata()
+
+
+def _blast_radius_context_grade(
+    *,
+    blast_radius_summary: BlastRadiusSummary,
+    local_workspace_path: str | Path | None,
+) -> ScanContextGrade:
+    if local_workspace_path is None:
+        return "unavailable"
+    if blast_radius_summary.availability in {"available", "partial"}:
+        return "review_grade"
+    return "unavailable"

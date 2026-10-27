@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import typer
 
 from pr_radar.application.scan import ScanError, scan_pr
@@ -19,10 +21,19 @@ def scan(
         "--fetch-evidence",
         help="Fetch PR evidence locally before rendering the report.",
     ),
+    local_workspace_path: Path | None = typer.Option(
+        None,
+        "--local-workspace-path",
+        help="Use a local workspace checkout for advisory blast-radius context.",
+    ),
 ) -> None:
     """Render a baseline local PR radar report."""
     try:
-        report = scan_pr(pr_url, fetch_evidence=fetch_evidence)
+        report = scan_pr(
+            pr_url,
+            fetch_evidence=fetch_evidence,
+            local_workspace_path=local_workspace_path,
+        )
     except ScanError as error:
         typer.echo(str(error))
         raise typer.Exit(code=1) from error

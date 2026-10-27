@@ -1,9 +1,11 @@
 from pr_radar.contracts import (
     EvidenceReference,
     Finding,
+    LOW_CONFIDENCE_TAG,
     PrInput,
     RedactedExcerpt,
     Report,
+    metadata_keys,
 )
 from pr_radar.report_renderer import render_text_report
 
@@ -50,7 +52,7 @@ def test_render_text_report_labels_low_confidence_findings() -> None:
         confidence=0.42,
         evidence_refs=["tests/test_service.py:12"],
         decision_source="deterministic",
-        tags=["low confidence"],
+        tags=[LOW_CONFIDENCE_TAG],
     )
     report = Report(
         overall_status="needs_attention",
@@ -170,3 +172,103 @@ def test_render_text_report_includes_redacted_finding_excerpts() -> None:
     assert "pytest.mark.skip" in rendered
     assert "api_key=<REDACTED_SECRET>" in rendered
     assert "sk_live_123456" not in rendered
+
+
+def test_render_text_report_includes_available_blast_radius_context() -> None:
+    """Catches reports that hide source-present downstream context."""
+    report = Report(
+        overall_status="safe",
+        pr_input=PrInput(
+            provider="github",
+            deployment="github_com",
+            repository="example/repo",
+            pull_request_number=17,
+            url="https://github.com/example/repo/pull/17",
+        ),
+        ai_signal_summary="No AI-generation evidence detected.",
+        evaluation_metadata={
+            metadata_keys.BLAST_RADIUS_CONTEXT_GRADE: "review_grade",
+            metadata_keys.BLAST_RADIUS_AVAILABILITY: "available",
+            metadata_keys.BLAST_RADIUS_REASON_CODE: "local_workspace_python_imports",
+            metadata_keys.BLAST_RADIUS_DEPENDENT_COUNT: "1",
+            metadata_keys.BLAST_RADIUS_TRUNCATED: "False",
+            metadata_keys.BLAST_RADIUS_CHANGED_PATHS: "src/service.py",
+            metadata_keys.BLAST_RADIUS_DIRECT_DEPENDENTS: "src/api.py",
+        },
+    )
+
+    rendered = render_text_report(report)
+
+    assert "Blast Radius & Downstream Context" in rendered
+    assert "Context Grade: review_grade" in rendered
+    assert "Availability: available" in rendered
+    assert "Reason: local_workspace_python_imports" in rendered
+    assert "Changed Paths: src/service.py" in rendered
+    assert "Direct Dependents: src/api.py" in rendered
+    assert "PRIVATE_RAW_SOURCE" not in rendered
+    assert "diff --git" not in rendered
+
+
+def test_render_text_report_includes_unavailable_blast_radius_context() -> None:
+    """Catches source-absent scans pretending downstream context is complete."""
+    report = Report(
+        overall_status="safe",
+        pr_input=PrInput(
+            provider="github",
+            deployment="github_com",
+            repository="example/repo",
+            pull_request_number=17,
+            url="https://github.com/example/repo/pull/17",
+        ),
+        ai_signal_summary="No AI-generation evidence detected.",
+        evaluation_metadata={
+            metadata_keys.BLAST_RADIUS_CONTEXT_GRADE: "unavailable",
+            metadata_keys.BLAST_RADIUS_AVAILABILITY: "unavailable",
+            metadata_keys.BLAST_RADIUS_REASON_CODE: "requires_local_workspace",
+            metadata_keys.BLAST_RADIUS_DEPENDENT_COUNT: "0",
+            metadata_keys.BLAST_RADIUS_TRUNCATED: "False",
+            metadata_keys.BLAST_RADIUS_CHANGED_PATHS: "src/service.py",
+            metadata_keys.BLAST_RADIUS_DIRECT_DEPENDENTS: "",
+        },
+    )
+
+    rendered = render_text_report(report)
+
+    assert "Blast Radius & Downstream Context" in rendered
+    assert "Context Grade: unavailable" in rendered
+    assert "Availability: unavailable" in rendered
+    assert "Reason: requires_local_workspace" in rendered
+    assert "Direct Dependents: None." in rendered
+
+
+def test_render_text_report_includes_partial_truncated_blast_radius_context() -> None:
+    """Catches budget-truncated downstream context being rendered as complete."""
+    report = Report(
+        overall_status="needs_attention",
+        pr_input=PrInput(
+            provider="github",
+            deployment="github_com",
+            repository="example/repo",
+            pull_request_number=17,
+            url="https://github.com/example/repo/pull/17",
+        ),
+        ai_signal_summary="No AI-generation evidence detected.",
+        evaluation_metadata={
+            metadata_keys.BLAST_RADIUS_CONTEXT_GRADE: "review_grade",
+            metadata_keys.BLAST_RADIUS_AVAILABILITY: "partial",
+            metadata_keys.BLAST_RADIUS_REASON_CODE: "budget_truncated",
+            metadata_keys.BLAST_RADIUS_DEPENDENT_COUNT: "3",
+            metadata_keys.BLAST_RADIUS_TRUNCATED: "True",
+            metadata_keys.BLAST_RADIUS_CHANGED_PATHS: "src/service.py",
+            metadata_keys.BLAST_RADIUS_DIRECT_DEPENDENTS: "src/api.py,src/worker.py",
+        },
+    )
+
+    rendered = render_text_report(report)
+
+    assert "Blast Radius & Downstream Context" in rendered
+    assert "Availability: partial" in rendered
+    assert "Reason: budget_truncated" in rendered
+    assert "Dependent Count: 3" in rendered
+    assert "Truncated: True" in rendered
+    assert "Direct Dependents: src/api.py, src/worker.py" in rendered

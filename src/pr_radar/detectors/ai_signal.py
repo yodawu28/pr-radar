@@ -10,6 +10,7 @@ from pr_radar.contracts import (
     DecisionSource,
     EvidenceReference,
     FindingStatus,
+    LOW_CONFIDENCE_TAG,
     PrEvidencePack,
     RedactedExcerpt,
 )
@@ -69,7 +70,7 @@ _DETERMINISTIC_CALIBRATION: Mapping[AiSignalType, _AiSignalCalibration] = {
         score=35,
         confidence=0.35,
         decision_source="deterministic",
-        tags=("low confidence",),
+        tags=(LOW_CONFIDENCE_TAG,),
         reason="repo_marker_weak_project_level_signal",
     ),
 }

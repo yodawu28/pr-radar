@@ -1,13 +1,17 @@
 from dataclasses import dataclass
 
-from pr_radar.contracts import Finding, FindingStatus, PrEvidencePack
+from pr_radar.contracts import (
+    Finding,
+    FindingStatus,
+    LOW_CONFIDENCE_TAG,
+    PrEvidencePack,
+)
 from pr_radar.detectors._shared.diff_blocks import added_lines, file_diff_block
 from pr_radar.pull_requests.file_taxonomy import is_sql_migration
 
 
 _MIGRATION_TAG = "detector:migration"
 _DESTRUCTIVE_TAG = "migration:destructive"
-_LOW_CONFIDENCE_TAG = "low confidence"
 
 _DESTRUCTIVE_SQL_CLUES = (
     "drop column",
@@ -97,7 +101,7 @@ def detect_migration_risks(
                     evidence_refs=evidence_refs,
                     decision_source="deterministic",
                     calibration_reason=_AMBIGUOUS_HIGH_IMPACT_CALIBRATION.reason,
-                    tags=(_MIGRATION_TAG, _LOW_CONFIDENCE_TAG),
+                    tags=(_MIGRATION_TAG, LOW_CONFIDENCE_TAG),
                 ),
             )
 

@@ -11,6 +11,7 @@ from pr_radar.contracts import (
     PrInput,
     PrMetadata,
     RawEvidence,
+    Report,
 )
 from pr_radar.github_adapter import GitHubEvidenceFetchError
 
@@ -173,3 +174,52 @@ def test_scan_fetch_enabled_transport_errors_fail_closed_without_traceback(
     assert "timeout" in result.output
     assert "ghp_raw_secret" not in result.output
     assert "Traceback" not in result.output
+
+
+def test_scan_fetch_enabled_accepts_local_workspace_path_option(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    """Catches CLI adapters that cannot request source-present blast radius."""
+    captured: dict[str, object] = {}
+
+    def fake_scan_pr(
+        pr_url: str,
+        *,
+        fetch_evidence: bool = False,
+        local_workspace_path=None,
+    ) -> Report:
+        captured["pr_url"] = pr_url
+        captured["fetch_evidence"] = fetch_evidence
+        captured["local_workspace_path"] = local_workspace_path
+        return Report(
+            overall_status="safe",
+            pr_input=PrInput(
+                provider="github",
+                deployment="github_com",
+                repository="example/repo",
+                pull_request_number=17,
+                url=pr_url,
+            ),
+            ai_signal_summary="No AI-generation evidence detected.",
+        )
+
+    monkeypatch.setattr(cli, "scan_pr", fake_scan_pr)
+
+    result = CliRunner().invoke(
+        cli.app,
+        [
+            "scan",
+            "https://github.com/example/repo/pull/17",
+            "--fetch-evidence",
+            "--local-workspace-path",
+            str(tmp_path),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert captured == {
+        "pr_url": "https://github.com/example/repo/pull/17",
+        "fetch_evidence": True,
+        "local_workspace_path": tmp_path,
+    }

@@ -163,7 +163,7 @@ def test_ai_signal_finding_contract_keeps_weak_repo_markers_visible() -> None:
         redacted_excerpts=[excerpt],
         decision_source="deterministic",
         calibration_reason="repo_marker_weak_project_level_signal",
-        tags=["low confidence"],
+        tags=[contracts.LOW_CONFIDENCE_TAG],
     )
 
     assert signal.signal_type == "repo_marker"
@@ -174,7 +174,7 @@ def test_ai_signal_finding_contract_keeps_weak_repo_markers_visible() -> None:
     assert signal.evidence_refs == (evidence_ref,)
     assert signal.redacted_excerpts == (excerpt,)
     assert signal.calibration_reason == "repo_marker_weak_project_level_signal"
-    assert signal.tags == ("low confidence",)
+    assert signal.tags == (contracts.LOW_CONFIDENCE_TAG,)
 
     with pytest.raises(ValidationError):
         contracts.AiSignalFinding(
@@ -188,5 +188,5 @@ def test_ai_signal_finding_contract_keeps_weak_repo_markers_visible() -> None:
             redacted_excerpts=[excerpt],
             decision_source="deterministic",
             calibration_reason="repo_marker_weak_project_level_signal",
-            tags=["low confidence"],
+            tags=[contracts.LOW_CONFIDENCE_TAG],
         )

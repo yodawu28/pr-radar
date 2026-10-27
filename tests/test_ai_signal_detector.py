@@ -6,6 +6,7 @@ from pr_radar.contracts import (
     ChangedFileMetadata,
     CommitMetadata,
     EvidenceReference,
+    LOW_CONFIDENCE_TAG,
     PrEvidencePack,
     PrInput,
     PrMetadata,
@@ -176,7 +177,7 @@ def test_detect_ai_signals_keeps_repo_markers_weak_and_visible() -> None:
     assert all(finding.score <= 40 for finding in findings)
     assert all(finding.confidence <= 0.4 for finding in findings)
     assert all(finding.decision_source == "deterministic" for finding in findings)
-    assert all(finding.tags == ("low confidence",) for finding in findings)
+    assert all(finding.tags == (LOW_CONFIDENCE_TAG,) for finding in findings)
     assert {
         evidence_ref
         for finding in findings
@@ -254,7 +255,7 @@ def test_detect_ai_signals_records_calibration_reasons_for_each_signal_kind() ->
             "score": 35,
             "confidence": 0.35,
             "decision_source": "deterministic",
-            "tags": ("low confidence",),
+            "tags": (LOW_CONFIDENCE_TAG,),
             "calibration_reason": "repo_marker_weak_project_level_signal",
         },
     }

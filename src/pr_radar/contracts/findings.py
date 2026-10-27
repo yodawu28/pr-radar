@@ -8,6 +8,7 @@ from pr_radar.contracts.references import RedactedExcerpt
 
 
 FindingStatus = Literal["info", "warning", "high", "critical"]
+LOW_CONFIDENCE_TAG = "low_confidence"
 
 
 class Finding(StrictContract):

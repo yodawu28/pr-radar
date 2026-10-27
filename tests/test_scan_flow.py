@@ -1,4 +1,5 @@
 from collections.abc import Mapping
+from pathlib import Path
 
 from pr_radar.contracts import (
     ChangedFileMetadata,
@@ -19,6 +20,12 @@ def _changed_file(path: str, diff: str) -> ChangedFileMetadata:
         additions=diff.count("\n+"),
         deletions=diff.count("\n-"),
     )
+
+
+def _write_file(workspace_path: Path, relative_path: str, content: str) -> None:
+    file_path = workspace_path / relative_path
+    file_path.parent.mkdir(parents=True, exist_ok=True)
+    file_path.write_text(content)
 
 
 def test_scan_pr_fetch_mode_builds_evidence_backed_report(monkeypatch) -> None:
@@ -181,3 +188,166 @@ def test_scan_pr_fetch_mode_integrates_static_findings_and_context_metadata(
     assert "sk_live_1234567890abcdef" not in report_text
     assert "PRIVATE_RAW_SOURCE" not in report_text
     assert "diff --git" not in report_text
+
+
+def test_scan_pr_fetch_mode_with_workspace_adds_blast_radius_context(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    """Locks source-present blast-radius integration without raw source leakage."""
+    service_diff = "diff --git a/src/service.py b/src/service.py\n+class Service:\n+    pass\n"
+    _write_file(tmp_path, "src/service.py", "class Service:\n    pass\n")
+    _write_file(
+        tmp_path,
+        "src/api.py",
+        "from src.service import Service\nPRIVATE_RAW_SOURCE = 'do not serialize'\n",
+    )
+
+    def fake_fetch_pr_evidence(
+        pr_input: PrInput,
+        *,
+        env: Mapping[str, str],
+        http_get,
+        include_file_contents: bool = False,
+    ) -> PrEvidencePack:
+        return PrEvidencePack(
+            pr_input=pr_input,
+            pr_metadata=PrMetadata(
+                title="Update service",
+                body="",
+                author_login="alice",
+                head_ref="feature/service",
+                base_ref="main",
+            ),
+            changed_files=(_changed_file("src/service.py", service_diff),),
+            raw_evidence=RawEvidence(
+                diff=service_diff,
+                file_contents={
+                    "src/service.py": "PRIVATE_RAW_SOURCE = 'do not serialize'\n",
+                },
+            ),
+        )
+
+    monkeypatch.setattr(
+        "pr_radar.application.scan.fetch_pr_evidence",
+        fake_fetch_pr_evidence,
+    )
+
+    report = scan_pr(
+        "https://github.com/example/repo/pull/17",
+        fetch_evidence=True,
+        local_workspace_path=tmp_path,
+        env={"GITHUB_TOKEN": "github_unit_secret_value"},
+        http_get=lambda url, *, headers: None,
+    )
+
+    assert report.evaluation_metadata["blast_radius_context_grade"] == "review_grade"
+    assert report.evaluation_metadata["blast_radius_availability"] == "available"
+    assert (
+        report.evaluation_metadata["blast_radius_reason_code"]
+        == "local_workspace_python_imports"
+    )
+    assert report.evaluation_metadata["blast_radius_dependent_count"] == "1"
+    assert report.evaluation_metadata["blast_radius_truncated"] == "False"
+
+    serialized_report = str(report.model_dump(mode="json"))
+    assert "src/api.py" in serialized_report
+    assert "PRIVATE_RAW_SOURCE" not in serialized_report
+    assert "diff --git" not in serialized_report
+
+
+def test_scan_pr_fetch_mode_without_workspace_marks_blast_radius_unavailable(
+    monkeypatch,
+) -> None:
+    """Source-absent PR URL scans must not claim downstream coverage."""
+    service_diff = "diff --git a/src/service.py b/src/service.py\n+class Service:\n+    pass\n"
+
+    def fake_fetch_pr_evidence(
+        pr_input: PrInput,
+        *,
+        env: Mapping[str, str],
+        http_get,
+        include_file_contents: bool = False,
+    ) -> PrEvidencePack:
+        return PrEvidencePack(
+            pr_input=pr_input,
+            pr_metadata=PrMetadata(
+                title="Update service",
+                body="",
+                author_login="alice",
+                head_ref="feature/service",
+                base_ref="main",
+            ),
+            changed_files=(_changed_file("src/service.py", service_diff),),
+            raw_evidence=RawEvidence(diff=service_diff),
+        )
+
+    monkeypatch.setattr(
+        "pr_radar.application.scan.fetch_pr_evidence",
+        fake_fetch_pr_evidence,
+    )
+
+    report = scan_pr(
+        "https://github.com/example/repo/pull/17",
+        fetch_evidence=True,
+        env={"GITHUB_TOKEN": "github_unit_secret_value"},
+        http_get=lambda url, *, headers: None,
+    )
+
+    assert report.evaluation_metadata["context_grade"] == "review_grade"
+    assert report.evaluation_metadata["blast_radius_context_grade"] == "unavailable"
+    assert report.evaluation_metadata["blast_radius_availability"] == "unavailable"
+    assert (
+        report.evaluation_metadata["blast_radius_reason_code"]
+        == "requires_local_workspace"
+    )
+    assert report.evaluation_metadata["blast_radius_dependent_count"] == "0"
+
+
+def test_scan_pr_fetch_mode_with_missing_workspace_does_not_claim_review_grade(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    """A configured but unavailable workspace is not source-present evidence."""
+    service_diff = "diff --git a/src/service.py b/src/service.py\n+class Service:\n+    pass\n"
+
+    def fake_fetch_pr_evidence(
+        pr_input: PrInput,
+        *,
+        env: Mapping[str, str],
+        http_get,
+        include_file_contents: bool = False,
+    ) -> PrEvidencePack:
+        return PrEvidencePack(
+            pr_input=pr_input,
+            pr_metadata=PrMetadata(
+                title="Update service",
+                body="",
+                author_login="alice",
+                head_ref="feature/service",
+                base_ref="main",
+            ),
+            changed_files=(_changed_file("src/service.py", service_diff),),
+            raw_evidence=RawEvidence(diff=service_diff),
+        )
+
+    monkeypatch.setattr(
+        "pr_radar.application.scan.fetch_pr_evidence",
+        fake_fetch_pr_evidence,
+    )
+
+    report = scan_pr(
+        "https://github.com/example/repo/pull/17",
+        fetch_evidence=True,
+        local_workspace_path=tmp_path / "missing-workspace",
+        env={"GITHUB_TOKEN": "github_unit_secret_value"},
+        http_get=lambda url, *, headers: None,
+    )
+
+    assert report.evaluation_metadata["blast_radius_context_grade"] == "unavailable"
+    assert report.evaluation_metadata["blast_radius_availability"] == "unavailable"
+    assert (
+        report.evaluation_metadata["blast_radius_reason_code"]
+        == "missing_local_workspace"
+    )
+    assert report.evaluation_metadata["blast_radius_dependent_count"] == "0"

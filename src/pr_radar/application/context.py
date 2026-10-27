@@ -3,7 +3,7 @@ from typing import Literal
 
 from pydantic import Field
 
-from pr_radar.contracts import Finding
+from pr_radar.contracts import BlastRadiusSummary, Finding
 from pr_radar.contracts.base import StrictContract
 from pr_radar.privacy.redaction import redact_text
 
@@ -36,6 +36,7 @@ class ContextEnvelope(StrictContract):
     budget: ContextBudget
     items: tuple[ContextEnvelopeItem, ...] = ()
     omitted_finding_ids: tuple[str, ...] = ()
+    blast_radius_summary: BlastRadiusSummary | None = None
 
 
 def build_context_envelope(
@@ -45,6 +46,7 @@ def build_context_envelope(
     max_chars: int,
     redacted_excerpts_by_finding_id: Mapping[str, Sequence[str]] | None = None,
     detector_ids_by_finding_id: Mapping[str, str] | None = None,
+    blast_radius_summary: BlastRadiusSummary | None = None,
 ) -> ContextEnvelope:
     excerpts_by_finding_id = redacted_excerpts_by_finding_id or {}
     detector_ids = detector_ids_by_finding_id or {}
@@ -87,6 +89,7 @@ def build_context_envelope(
         ),
         items=tuple(items),
         omitted_finding_ids=tuple(omitted_finding_ids),
+        blast_radius_summary=blast_radius_summary,
     )
 
 

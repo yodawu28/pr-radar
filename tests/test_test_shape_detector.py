@@ -1,5 +1,6 @@
 from pr_radar.contracts import (
     ChangedFileMetadata,
+    LOW_CONFIDENCE_TAG,
     PrEvidencePack,
     PrInput,
     PrMetadata,
@@ -89,7 +90,7 @@ def test_test_shape_detector_flags_behavior_change_without_tests() -> None:
     assert finding.calibration_reason == (
         "behavior_change_without_test_evidence_low_confidence"
     )
-    assert finding.tags == ("detector:test_shape", "low confidence")
+    assert finding.tags == ("detector:test_shape", LOW_CONFIDENCE_TAG)
     assert result.context_envelope.items[0].detector_id == "test_shape"
 
 

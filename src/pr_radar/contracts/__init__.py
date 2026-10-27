@@ -1,3 +1,8 @@
+from pr_radar.contracts.blast_radius import (
+    BlastRadiusBudget,
+    BlastRadiusDependent,
+    BlastRadiusSummary,
+)
 from pr_radar.contracts.decisions import Decision, DecisionSource, DecisionStatus
 from pr_radar.contracts.evidence import (
     AiSignalFinding,
@@ -17,12 +22,15 @@ from pr_radar.contracts.evidence import (
     RawEvidence,
     RedactedExcerpt,
 )
-from pr_radar.contracts.findings import Finding, FindingStatus
+from pr_radar.contracts.findings import Finding, FindingStatus, LOW_CONFIDENCE_TAG
 from pr_radar.contracts.inputs import PrDeployment, PrInput
 from pr_radar.contracts.reports import REPORT_SCHEMA_VERSION, Report
 
 __all__ = (
     "REPORT_SCHEMA_VERSION",
+    "BlastRadiusSummary",
+    "BlastRadiusDependent",
+    "BlastRadiusBudget",
     "PrInput",
     "PrDeployment",
     "PrMetadata",
@@ -43,6 +51,7 @@ __all__ = (
     "PrEvidencePack",
     "Decision",
     "Finding",
+    "LOW_CONFIDENCE_TAG",
     "Report",
     "DecisionStatus",
     "FindingStatus",

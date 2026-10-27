@@ -4,6 +4,7 @@ from pr_radar.contracts import (
     EvidenceReference,
     Finding,
     FindingStatus,
+    LOW_CONFIDENCE_TAG,
     PrEvidencePack,
 )
 from pr_radar.detectors._shared.diff_blocks import added_lines, file_diff_block
@@ -12,7 +13,6 @@ from pr_radar.pull_requests.file_taxonomy import is_source_path, is_test_path
 
 
 _TEST_SHAPE_TAG = "detector:test_shape"
-_LOW_CONFIDENCE_TAG = "low confidence"
 _DISABLED_TEST_TAG = "test:disabled"
 
 _DISABLED_TEST_CLUES = (
@@ -136,7 +136,7 @@ def _missing_behavior_coverage_finding(path: str) -> Finding:
         evidence_refs=(f"file:{path}", f"diff:{path}"),
         decision_source="deterministic",
         calibration_reason=_MISSING_BEHAVIOR_COVERAGE_CALIBRATION.reason,
-        tags=(_TEST_SHAPE_TAG, _LOW_CONFIDENCE_TAG),
+        tags=(_TEST_SHAPE_TAG, LOW_CONFIDENCE_TAG),
     )
 
 

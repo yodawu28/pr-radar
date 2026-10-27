@@ -1,4 +1,4 @@
-from pr_radar.contracts import Finding, Report
+from pr_radar.contracts import Finding, Report, metadata_keys
 from pr_radar.privacy.redaction import redact_text
 
 
@@ -46,6 +46,9 @@ def render_text_report(report: Report) -> str:
         lines.extend(_format_finding(finding) for finding in other_findings)
 
     lines.append("")
+    lines.extend(_format_blast_radius_context(report))
+
+    lines.append("")
     lines.append("Low Confidence Findings")
     if not report.low_confidence_findings:
         lines.append("None.")
@@ -71,7 +74,11 @@ def _group_findings_by_pillar(
 
 
 def _format_finding(finding: Finding) -> str:
-    tags = f" tags={','.join(finding.tags)}" if finding.tags else ""
+    tags = (
+        f" tags={','.join(_format_tag(tag) for tag in finding.tags)}"
+        if finding.tags
+        else ""
+    )
     evidence = ", ".join(finding.evidence_refs)
     excerpts = _format_excerpts(finding)
     return (
@@ -80,6 +87,40 @@ def _format_finding(finding: Finding) -> str:
         f"confidence={finding.confidence:.2f} source={finding.decision_source}"
         f"{tags}: {finding.title} evidence={evidence}{excerpts}"
     )
+
+
+def _format_blast_radius_context(report: Report) -> list[str]:
+    metadata = report.evaluation_metadata
+    if metadata_keys.BLAST_RADIUS_CONTEXT_GRADE not in metadata:
+        return ["Blast Radius & Downstream Context: No context metadata yet."]
+
+    changed_paths = _format_csv_metadata_value(
+        metadata.get(metadata_keys.BLAST_RADIUS_CHANGED_PATHS, ""),
+    )
+    direct_dependents = _format_csv_metadata_value(
+        metadata.get(metadata_keys.BLAST_RADIUS_DIRECT_DEPENDENTS, ""),
+    )
+    return [
+        "Blast Radius & Downstream Context",
+        f"Context Grade: {metadata.get(metadata_keys.BLAST_RADIUS_CONTEXT_GRADE, 'unknown')}",
+        f"Availability: {metadata.get(metadata_keys.BLAST_RADIUS_AVAILABILITY, 'unknown')}",
+        f"Reason: {metadata.get(metadata_keys.BLAST_RADIUS_REASON_CODE, 'unknown')}",
+        f"Dependent Count: {metadata.get(metadata_keys.BLAST_RADIUS_DEPENDENT_COUNT, '0')}",
+        f"Truncated: {metadata.get(metadata_keys.BLAST_RADIUS_TRUNCATED, 'False')}",
+        f"Changed Paths: {changed_paths}",
+        f"Direct Dependents: {direct_dependents}",
+    ]
+
+
+def _format_csv_metadata_value(value: str) -> str:
+    items = tuple(item.strip() for item in value.split(",") if item.strip())
+    if not items:
+        return "None."
+    return ", ".join(items)
+
+
+def _format_tag(tag: str) -> str:
+    return tag.replace("_", " ")
 
 
 def _format_excerpts(finding: Finding) -> str:

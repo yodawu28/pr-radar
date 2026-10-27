@@ -18,6 +18,9 @@ def test_contract_facade_exports_stable_public_names() -> None:
 
     assert contracts.__all__ == (
         "REPORT_SCHEMA_VERSION",
+        "BlastRadiusSummary",
+        "BlastRadiusDependent",
+        "BlastRadiusBudget",
         "PrInput",
         "PrDeployment",
         "PrMetadata",
@@ -38,6 +41,7 @@ def test_contract_facade_exports_stable_public_names() -> None:
         "PrEvidencePack",
         "Decision",
         "Finding",
+            "LOW_CONFIDENCE_TAG",
         "Report",
         "DecisionStatus",
         "FindingStatus",
@@ -54,7 +58,11 @@ def test_contract_facade_reexports_domain_modules() -> None:
     decisions = import_module("pr_radar.contracts.decisions")
     findings = import_module("pr_radar.contracts.findings")
     reports = import_module("pr_radar.contracts.reports")
+    blast_radius = import_module("pr_radar.contracts.blast_radius")
 
+    assert contracts.BlastRadiusSummary is blast_radius.BlastRadiusSummary
+    assert contracts.BlastRadiusDependent is blast_radius.BlastRadiusDependent
+    assert contracts.BlastRadiusBudget is blast_radius.BlastRadiusBudget
     assert contracts.PrInput is inputs.PrInput
     assert contracts.PrDeployment is inputs.PrDeployment
     assert contracts.PrMetadata is evidence.PrMetadata
@@ -131,7 +139,7 @@ def test_finding_contract_bounds_scores_and_preserves_evidence_refs() -> None:
         evidence_refs=["pyproject.toml:8"],
         decision_source="deterministic",
         calibration_reason="dependency_added_manifest_requires_supply_chain_review",
-        tags=["low confidence"],
+        tags=[contracts.LOW_CONFIDENCE_TAG],
     )
 
     assert finding.status == "warning"
@@ -141,7 +149,7 @@ def test_finding_contract_bounds_scores_and_preserves_evidence_refs() -> None:
     assert finding.calibration_reason == (
         "dependency_added_manifest_requires_supply_chain_review"
     )
-    assert finding.tags == ("low confidence",)
+    assert finding.tags == (contracts.LOW_CONFIDENCE_TAG,)
 
     with pytest.raises(ValidationError):
         contracts.Finding(
@@ -217,7 +225,7 @@ def test_report_contract_groups_findings_without_mutable_defaults() -> None:
         confidence=0.64,
         evidence_refs=["tests/test_export.py:12"],
         decision_source="deterministic",
-        tags=["low confidence"],
+        tags=[contracts.LOW_CONFIDENCE_TAG],
     )
 
     report = contracts.Report(
