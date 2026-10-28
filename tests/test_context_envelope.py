@@ -1,5 +1,8 @@
 from importlib import import_module, util
 
+import pytest
+from pydantic import ValidationError
+
 from pr_radar.contracts import (
     BlastRadiusBudget,
     BlastRadiusDependent,
@@ -32,6 +35,55 @@ def _dependency_finding() -> Finding:
         calibration_reason="dependency_added_manifest_requires_supply_chain_review",
         tags=("detector:dependency",),
     )
+
+
+def test_context_envelope_models_are_public_contracts() -> None:
+    """Prevents review code from depending on application workflow internals."""
+    contracts = import_module("pr_radar.contracts")
+    context = _context_module()
+    context_contracts = import_module("pr_radar.contracts.context")
+    missing = tuple(
+        name
+        for name in (
+            "CONTEXT_ENVELOPE_SCHEMA_VERSION",
+            "ContextEnvelope",
+            "ContextEnvelopeItem",
+            "ContextBudget",
+            "ContextGrade",
+        )
+        if not hasattr(contracts, name)
+    )
+
+    assert missing == ()
+    assert contracts.CONTEXT_ENVELOPE_SCHEMA_VERSION == "pr-radar.context-envelope.v1"
+    assert contracts.ContextEnvelope is context_contracts.ContextEnvelope
+    assert contracts.ContextEnvelopeItem is context_contracts.ContextEnvelopeItem
+    assert contracts.ContextBudget is context_contracts.ContextBudget
+    assert context.ContextEnvelope is contracts.ContextEnvelope
+    assert context.ContextEnvelopeItem is contracts.ContextEnvelopeItem
+    assert context.ContextBudget is contracts.ContextBudget
+
+    envelope = contracts.ContextEnvelope(
+        context_grade="review_grade",
+        budget=contracts.ContextBudget(
+            max_chars=1_200,
+            used_chars=0,
+            is_over_budget=False,
+        ),
+    )
+
+    assert envelope.schema_version == contracts.CONTEXT_ENVELOPE_SCHEMA_VERSION
+
+    with pytest.raises(ValidationError):
+        contracts.ContextEnvelope(
+            context_grade="review_grade",
+            budget=contracts.ContextBudget(
+                max_chars=1_200,
+                used_chars=0,
+                is_over_budget=False,
+            ),
+            raw_diff="diff --git a/app.py b/app.py",
+        )
 
 
 def test_context_envelope_carries_report_safe_finding_context() -> None:

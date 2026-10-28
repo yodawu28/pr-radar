@@ -32,9 +32,11 @@ high-signal engineering risks that matter during review: AI-generation signals,
 dependency changes, destructive migration clues, test-shape risks, and bounded
 downstream context.
 
-The project is designed around deterministic checks first. Future AI or
-decision-model layers can prioritize and explain findings, but they must not
-override static policy failures or receive raw private source by default.
+The project is designed around deterministic checks first. The local CLI
+renders deterministic decision recommendations from bounded, report-safe
+context. Future hosted AI or decision-model layers can prioritize and explain
+findings, but they must not override static policy failures or receive raw
+private source by default.
 
 ## Why PR Radar?
 
@@ -61,7 +63,9 @@ Current capabilities:
   clues, and test-shape risks.
 - Render a local text report with stable finding IDs, evidence references,
   calibration reasons, and redacted excerpts.
-- Build a bounded context envelope for future decision-layer use.
+- Build a bounded context envelope for local decision-layer use.
+- Render a `Decision Recommendation` section with per-pillar decision status
+  from the deterministic Kev-compatible local scorer.
 
 ## Quickstart
 
@@ -102,6 +106,7 @@ PR URL
   -> deterministic risk detectors
   -> advisory blast-radius context
   -> bounded context envelope
+  -> Kev-compatible local decision recommendation
   -> local text report
 ```
 
@@ -109,6 +114,8 @@ Core boundaries:
 - Raw evidence stays local to fetchers and detectors.
 - Reports render normalized evidence references and redacted excerpts.
 - Blast-radius output is advisory context, not a finding by itself.
+- Decision recommendations consume bounded report-safe context, not raw diffs
+  or source files.
 - Contract vocabularies stay stable for future evaluation.
 
 ## Privacy Model

@@ -6,6 +6,7 @@ from pydantic import Field, field_serializer, field_validator
 
 from pr_radar.contracts.base import StrictContract
 from pr_radar.contracts.decisions import DecisionStatus
+from pr_radar.contracts.decisions import RiskDecision
 from pr_radar.contracts.findings import Finding
 from pr_radar.contracts.inputs import PrInput
 
@@ -20,6 +21,7 @@ class Report(StrictContract):
     ai_signal_summary: str
     findings: tuple[Finding, ...] = ()
     low_confidence_findings: tuple[Finding, ...] = ()
+    risk_decision: RiskDecision | None = None
     evaluation_metadata: Mapping[str, str] = Field(
         default_factory=dict,
         validate_default=True,

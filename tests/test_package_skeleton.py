@@ -40,7 +40,7 @@ def test_scan_subcommand_renders_local_baseline_report() -> None:
 
     assert result.exit_code == 0
     assert "PR Radar Local Report" in result.output
-    assert "Overall Status: safe" in result.output
+    assert "Overall Status: needs_attention" in result.output
     assert "PR: example/repo#17" in result.output
     assert "URL: https://github.com/example/repo/pull/17" in result.output
     assert "AI Signal: No AI-generation evidence collected yet." in result.output

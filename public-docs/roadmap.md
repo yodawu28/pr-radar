@@ -26,10 +26,16 @@ Non-goals:
 Scope: Sprint 4.0 through Sprint 5.0.
 
 Goals:
-- Add a Kev/local decision layer over bounded context.
+- Add Kev-compatible local decision recommendations over bounded context.
 - Score severity and report inclusion without overriding deterministic failures.
 - Preserve low-confidence findings in the report.
 - Evaluate findings against curated ground-truth repositories by finding ID.
+
+Current Sprint 4 output:
+- Local reports include a `Decision Recommendation` section.
+- Recommendations are produced by a deterministic `kev_local_scorer`.
+- The scorer consumes bounded report-safe context, not raw diffs or source
+  files.
 
 ## Phase 3: Team Integration And GitHub Automation
 

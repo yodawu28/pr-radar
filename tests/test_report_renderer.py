@@ -2,9 +2,11 @@ from pr_radar.contracts import (
     EvidenceReference,
     Finding,
     LOW_CONFIDENCE_TAG,
+    PillarDecision,
     PrInput,
     RedactedExcerpt,
     Report,
+    RiskDecision,
     metadata_keys,
 )
 from pr_radar.report_renderer import render_text_report
@@ -272,3 +274,49 @@ def test_render_text_report_includes_partial_truncated_blast_radius_context() ->
     assert "Dependent Count: 3" in rendered
     assert "Truncated: True" in rendered
     assert "Direct Dependents: src/api.py, src/worker.py" in rendered
+
+
+def test_render_text_report_includes_decision_recommendation_and_pillars() -> None:
+    """Catches reports that serialize decisions but hide them from humans."""
+    report = Report(
+        overall_status="needs_attention",
+        pr_input=PrInput(
+            provider="github",
+            deployment="github_com",
+            repository="example/repo",
+            pull_request_number=17,
+            url="https://github.com/example/repo/pull/17",
+        ),
+        ai_signal_summary="No AI-generation evidence detected.",
+        risk_decision=RiskDecision(
+            recommendation="APPROVE_WITH_CAUTION",
+            overall_score=70,
+            overall_confidence=0.74,
+            decision_source="kev_local_scorer",
+            primary_reason_codes=("WARNING_FINDING_PRESENT",),
+            evaluated_pillars={
+                "security_supply_chain": PillarDecision(
+                    pillar="security_supply_chain",
+                    status="warning",
+                    score=70,
+                    confidence=0.74,
+                    reason_codes=("WARNING_FINDING_PRESENT",),
+                    evaluated_finding_ids=("dependency.added.pyproject",),
+                ),
+                "test_integrity": PillarDecision(
+                    pillar="test_integrity",
+                    status="not_evaluated",
+                    score=0,
+                    confidence=1.0,
+                ),
+            },
+        ),
+    )
+
+    rendered = render_text_report(report)
+
+    assert "Decision Recommendation" in rendered
+    assert "Recommendation: APPROVE_WITH_CAUTION" in rendered
+    assert "Decision Source: kev_local_scorer" in rendered
+    assert "Security & Supply Chain: warning" in rendered
+    assert "Test Integrity & Edge Cases: not_evaluated" in rendered

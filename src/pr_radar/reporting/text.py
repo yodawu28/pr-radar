@@ -1,16 +1,5 @@
-from pr_radar.contracts import Finding, Report, metadata_keys
+from pr_radar.contracts import Finding, RADAR_PILLARS, Report, metadata_keys
 from pr_radar.privacy.redaction import redact_text
-
-
-RADAR_PILLARS: tuple[tuple[str, str], ...] = (
-    ("security_supply_chain", "Security & Supply Chain"),
-    ("deployment_downtime", "Deployment & Downtime"),
-    ("blast_radius_downstream", "Blast Radius & Downstream"),
-    ("performance_footprint", "Performance & Footprint"),
-    ("anti_bloat_dry", "Anti-Bloat & DRY"),
-    ("test_integrity", "Test Integrity & Edge Cases"),
-    ("rollback_feature_flags", "Rollback & Feature Flags"),
-)
 
 
 def render_text_report(report: Report) -> str:
@@ -21,19 +10,21 @@ def render_text_report(report: Report) -> str:
         f"PR: {report.pr_input.repository}#{report.pr_input.pull_request_number}",
         f"URL: {report.pr_input.url}",
         f"AI Signal: {redact_text(report.ai_signal_summary, limit=False)}",
-        "",
-        "Radar",
     ]
+    lines.append("")
+    lines.extend(_format_decision_recommendation(report))
+    lines.append("")
+    lines.append("Radar")
 
     findings_by_pillar = _group_findings_by_pillar(report.findings)
-    known_pillars = {pillar_key for pillar_key, _ in RADAR_PILLARS}
-    for pillar_key, pillar_label in RADAR_PILLARS:
-        pillar_findings = findings_by_pillar.get(pillar_key, ())
+    known_pillars = {pillar.key for pillar in RADAR_PILLARS}
+    for pillar in RADAR_PILLARS:
+        pillar_findings = findings_by_pillar.get(pillar.key, ())
         if not pillar_findings:
-            lines.append(f"{pillar_label}: No findings yet.")
+            lines.append(f"{pillar.label}: No findings yet.")
             continue
 
-        lines.append(f"{pillar_label}:")
+        lines.append(f"{pillar.label}:")
         lines.extend(_format_finding(finding) for finding in pillar_findings)
 
     other_findings = tuple(
@@ -59,6 +50,39 @@ def render_text_report(report: Report) -> str:
         )
 
     return "\n".join(lines)
+
+
+def _format_decision_recommendation(report: Report) -> list[str]:
+    decision = report.risk_decision
+    if decision is None:
+        return ["Decision Recommendation", "No decision available."]
+
+    lines = [
+        "Decision Recommendation",
+        f"Recommendation: {decision.recommendation}",
+        f"Decision Source: {decision.decision_source}",
+        f"Overall Score: {decision.overall_score}",
+        f"Overall Confidence: {decision.overall_confidence:.2f}",
+    ]
+    if decision.primary_reason_codes:
+        lines.append(f"Primary Reasons: {', '.join(decision.primary_reason_codes)}")
+
+    known_pillars = {pillar.key for pillar in RADAR_PILLARS}
+    for pillar in RADAR_PILLARS:
+        pillar_decision = decision.evaluated_pillars.get(pillar.key)
+        status = (
+            pillar_decision.status
+            if pillar_decision is not None
+            else "not_evaluated"
+        )
+        lines.append(f"{pillar.label}: {status}")
+
+    for pillar_key, pillar_decision in decision.evaluated_pillars.items():
+        if pillar_key in known_pillars:
+            continue
+        lines.append(f"{pillar_key}: {pillar_decision.status}")
+
+    return lines
 
 
 def _group_findings_by_pillar(

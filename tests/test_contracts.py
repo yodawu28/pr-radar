@@ -18,9 +18,17 @@ def test_contract_facade_exports_stable_public_names() -> None:
 
     assert contracts.__all__ == (
         "REPORT_SCHEMA_VERSION",
+        "CONTEXT_ENVELOPE_SCHEMA_VERSION",
         "BlastRadiusSummary",
         "BlastRadiusDependent",
         "BlastRadiusBudget",
+        "ContextEnvelope",
+        "ContextEnvelopeItem",
+        "ContextBudget",
+        "ContextGrade",
+        "RADAR_PILLARS",
+        "RadarPillarDefinition",
+        "RadarPillarKey",
         "PrInput",
         "PrDeployment",
         "PrMetadata",
@@ -40,10 +48,17 @@ def test_contract_facade_exports_stable_public_names() -> None:
         "AiSignalStrength",
         "PrEvidencePack",
         "Decision",
+        "DecisionReasonCode",
+        "DECISION_REASON_CODES",
+        "RiskDecision",
+        "FindingDecision",
+        "PillarDecision",
         "Finding",
-            "LOW_CONFIDENCE_TAG",
+        "LOW_CONFIDENCE_TAG",
         "Report",
         "DecisionStatus",
+        "DecisionRecommendation",
+        "PillarDecisionStatus",
         "FindingStatus",
         "DecisionSource",
     )
@@ -59,10 +74,17 @@ def test_contract_facade_reexports_domain_modules() -> None:
     findings = import_module("pr_radar.contracts.findings")
     reports = import_module("pr_radar.contracts.reports")
     blast_radius = import_module("pr_radar.contracts.blast_radius")
+    context = import_module("pr_radar.contracts.context")
+    radar = import_module("pr_radar.contracts.radar")
 
     assert contracts.BlastRadiusSummary is blast_radius.BlastRadiusSummary
     assert contracts.BlastRadiusDependent is blast_radius.BlastRadiusDependent
     assert contracts.BlastRadiusBudget is blast_radius.BlastRadiusBudget
+    assert contracts.ContextEnvelope is context.ContextEnvelope
+    assert contracts.ContextEnvelopeItem is context.ContextEnvelopeItem
+    assert contracts.ContextBudget is context.ContextBudget
+    assert contracts.RADAR_PILLARS is radar.RADAR_PILLARS
+    assert contracts.RadarPillarDefinition is radar.RadarPillarDefinition
     assert contracts.PrInput is inputs.PrInput
     assert contracts.PrDeployment is inputs.PrDeployment
     assert contracts.PrMetadata is evidence.PrMetadata
@@ -82,9 +104,28 @@ def test_contract_facade_reexports_domain_modules() -> None:
     assert contracts.AiSignalStrength is evidence.AiSignalStrength
     assert contracts.PrEvidencePack is evidence.PrEvidencePack
     assert contracts.Decision is decisions.Decision
+    assert contracts.DECISION_REASON_CODES is decisions.DECISION_REASON_CODES
+    assert contracts.RiskDecision is decisions.RiskDecision
+    assert contracts.FindingDecision is decisions.FindingDecision
+    assert contracts.PillarDecision is decisions.PillarDecision
     assert contracts.Finding is findings.Finding
     assert contracts.Report is reports.Report
     assert contracts.REPORT_SCHEMA_VERSION is reports.REPORT_SCHEMA_VERSION
+
+
+def test_radar_pillars_are_fixed_contract_vocabulary() -> None:
+    """Catches renderer/scorer drift from the executive radar shape."""
+    contracts = _contracts_module()
+
+    assert tuple(pillar.key for pillar in contracts.RADAR_PILLARS) == (
+        "security_supply_chain",
+        "deployment_downtime",
+        "blast_radius_downstream",
+        "performance_footprint",
+        "anti_bloat_dry",
+        "test_integrity",
+        "rollback_feature_flags",
+    )
 
 
 def test_pr_input_requires_github_identity_and_deployment() -> None:

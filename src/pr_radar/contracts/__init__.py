@@ -3,7 +3,25 @@ from pr_radar.contracts.blast_radius import (
     BlastRadiusDependent,
     BlastRadiusSummary,
 )
-from pr_radar.contracts.decisions import Decision, DecisionSource, DecisionStatus
+from pr_radar.contracts.context import (
+    CONTEXT_ENVELOPE_SCHEMA_VERSION,
+    ContextBudget,
+    ContextEnvelope,
+    ContextEnvelopeItem,
+    ContextGrade,
+)
+from pr_radar.contracts.decisions import (
+    DECISION_REASON_CODES,
+    DecisionReasonCode,
+    Decision,
+    DecisionRecommendation,
+    DecisionSource,
+    DecisionStatus,
+    FindingDecision,
+    PillarDecision,
+    PillarDecisionStatus,
+    RiskDecision,
+)
 from pr_radar.contracts.evidence import (
     AiSignalFinding,
     AiSignalCalibrationReason,
@@ -24,13 +42,26 @@ from pr_radar.contracts.evidence import (
 )
 from pr_radar.contracts.findings import Finding, FindingStatus, LOW_CONFIDENCE_TAG
 from pr_radar.contracts.inputs import PrDeployment, PrInput
+from pr_radar.contracts.radar import (
+    RADAR_PILLARS,
+    RadarPillarDefinition,
+    RadarPillarKey,
+)
 from pr_radar.contracts.reports import REPORT_SCHEMA_VERSION, Report
 
 __all__ = (
     "REPORT_SCHEMA_VERSION",
+    "CONTEXT_ENVELOPE_SCHEMA_VERSION",
     "BlastRadiusSummary",
     "BlastRadiusDependent",
     "BlastRadiusBudget",
+    "ContextEnvelope",
+    "ContextEnvelopeItem",
+    "ContextBudget",
+    "ContextGrade",
+    "RADAR_PILLARS",
+    "RadarPillarDefinition",
+    "RadarPillarKey",
     "PrInput",
     "PrDeployment",
     "PrMetadata",
@@ -50,10 +81,17 @@ __all__ = (
     "AiSignalStrength",
     "PrEvidencePack",
     "Decision",
+    "DecisionReasonCode",
+    "DECISION_REASON_CODES",
+    "RiskDecision",
+    "FindingDecision",
+    "PillarDecision",
     "Finding",
     "LOW_CONFIDENCE_TAG",
     "Report",
     "DecisionStatus",
+    "DecisionRecommendation",
+    "PillarDecisionStatus",
     "FindingStatus",
     "DecisionSource",
 )

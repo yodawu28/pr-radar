@@ -11,6 +11,7 @@ TARGET_PACKAGES = (
     "pr_radar.application",
     "pr_radar.pull_requests",
     "pr_radar.privacy",
+    "pr_radar.review",
     "pr_radar.reporting",
 )
 
@@ -31,9 +32,26 @@ def test_workflow_domain_target_packages_exist() -> None:
     assert missing_packages == ()
 
 
-def test_review_package_is_not_created_before_review_domain_exists() -> None:
-    """Catches premature review-package drift before Sprint 3 owns review behavior."""
-    assert not (SRC_ROOT / "review").exists()
+def test_review_package_owns_decision_behavior_without_detector_imports() -> None:
+    """Catches decision-domain code drifting into detectors or scan facades."""
+    assert (SRC_ROOT / "review").exists()
+
+    review_imports = {
+        imported
+        for path in sorted(SRC_ROOT.joinpath("review").rglob("*.py"))
+        for imported in _module_imports(path)
+    }
+
+    assert not {
+        imported
+        for imported in review_imports
+        if imported.startswith("pr_radar.detectors")
+    }
+    assert not {
+        imported
+        for imported in review_imports
+        if imported.startswith("pr_radar.application")
+    }
 
 
 def test_root_workflow_modules_are_thin_compatibility_facades() -> None:
@@ -59,6 +77,20 @@ def test_pr_radar_source_modules_do_not_have_import_cycles() -> None:
     cycles = tuple(_find_cycles(graph))
 
     assert cycles == ()
+
+
+def test_scan_uses_contract_context_envelope_type_not_application_reexport() -> None:
+    """Catches static analyzer drift from importing contract models via builders."""
+    syntax_tree = _module_syntax_tree("src/pr_radar/application/scan.py")
+    imported_names = {
+        (node.module, alias.name)
+        for node in syntax_tree.body
+        if isinstance(node, ast.ImportFrom) and node.module is not None
+        for alias in node.names
+    }
+
+    assert ("pr_radar.contracts", "ContextEnvelope") in imported_names
+    assert ("pr_radar.application.context", "ContextEnvelope") not in imported_names
 
 
 def test_detector_families_are_grouped_by_radar_pillar() -> None:
@@ -94,8 +126,10 @@ def test_public_documentation_surface_is_available() -> None:
     roadmap = (PROJECT_ROOT / "public-docs" / "roadmap.md").read_text()
 
     assert "Privacy-first AI risk radar" in readme
+    assert "Decision Recommendation" in readme
     assert "Product roadmap" in public_docs
     assert "Phase 1: Local Utility And Core Risk Engine" in roadmap
+    assert "local decision recommendations" in roadmap
 
 
 def test_internal_docs_are_not_required_by_public_contract_tests() -> None:

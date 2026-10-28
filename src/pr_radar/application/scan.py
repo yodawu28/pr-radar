@@ -4,7 +4,6 @@ from pathlib import Path
 
 from pr_radar.adapters.github.urllib_http import urllib_http_get
 from pr_radar.application.blast_radius import trace_blast_radius
-from pr_radar.application.context import ContextEnvelope
 from pr_radar.application.scan_metadata import (
     ContextGrade as ScanContextGrade,
     ScanEvaluationMetadata,
@@ -14,6 +13,7 @@ from pr_radar.contracts import (
     AiSignalFinding,
     BlastRadiusBudget,
     BlastRadiusSummary,
+    ContextEnvelope,
     DecisionStatus,
     Finding,
     LOW_CONFIDENCE_TAG,
@@ -29,6 +29,7 @@ from pr_radar.github_adapter import (
     fetch_pr_evidence,
 )
 from pr_radar.pull_requests.identity import PrUrlParseError, parse_pr_url
+from pr_radar.review import evaluate_risk_decision
 
 
 class ScanError(ValueError):
@@ -51,9 +52,10 @@ def scan_pr(
 
     if not fetch_evidence:
         return Report(
-            overall_status="safe",
+            overall_status="needs_attention",
             pr_input=pr_input,
             ai_signal_summary="No AI-generation evidence collected yet.",
+            risk_decision=evaluate_risk_decision(None),
             evaluation_metadata=_parser_only_metadata(),
         )
 
@@ -92,6 +94,7 @@ def scan_pr(
         low_confidence_findings=_low_confidence_findings(
             static_risk_result.findings,
         ),
+        risk_decision=evaluate_risk_decision(static_risk_result.context_envelope),
         evaluation_metadata=_context_metadata(
             static_risk_result.context_envelope,
             blast_radius_summary=blast_radius_summary,
