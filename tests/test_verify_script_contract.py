@@ -5,6 +5,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).parents[1]
 VERIFY_SCRIPT = PROJECT_ROOT / "scripts" / "verify.sh"
 AGENTS_GUIDE = PROJECT_ROOT / "AGENTS.md"
+UNIT_TEST_WORKFLOW = PROJECT_ROOT / ".github" / "workflows" / "unit-tests.yml"
 
 
 def test_verify_success_message_is_after_all_fail_closed_guards() -> None:
@@ -39,6 +40,17 @@ def test_verify_does_not_require_ripgrep_on_ci_runners() -> None:
     assert "grep -Eq" in script
     assert "find_markdown_tabs()" in script
     assert "xargs -0 grep -n" in script
+
+
+def test_github_action_uses_resolvable_setup_uv_ref() -> None:
+    """Prevents CI from using an unresolved setup-uv major tag."""
+    workflow = UNIT_TEST_WORKFLOW.read_text()
+
+    assert "astral-sh/setup-uv@v10" not in workflow
+    assert re.search(
+        r"uses:\s+astral-sh/setup-uv@[0-9a-f]{40}\s+#\s+v\d+\.\d+\.\d+",
+        workflow,
+    )
 
 
 def _shell_constant(script: str, name: str) -> int:
