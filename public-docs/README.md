@@ -10,3 +10,4 @@ internal repository details.
 Start here:
 - [Product roadmap](roadmap.md)
 - [Glossary](glossary.md)
+- [Sprint 5.0 evaluation baseline](sprint-5-evaluation-baseline.md)

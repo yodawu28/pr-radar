@@ -1,6 +1,7 @@
 from collections.abc import Mapping
 from pathlib import Path
 
+from pr_radar.adapters.github.http import GitHubHttpResponse
 from pr_radar.contracts import (
     ChangedFileMetadata,
     CommitMetadata,
@@ -11,6 +12,14 @@ from pr_radar.contracts import (
 )
 from pr_radar.report_renderer import render_text_report
 from pr_radar.scan import scan_pr
+
+
+def _unused_http_get(
+    url: str,
+    *,
+    headers: Mapping[str, str] | None = None,
+) -> GitHubHttpResponse:
+    raise AssertionError(f"http_get should not be called in scan fixture: {url}")
 
 
 def _changed_file(path: str, diff: str) -> ChangedFileMetadata:
@@ -70,7 +79,7 @@ def test_scan_pr_fetch_mode_builds_evidence_backed_report(monkeypatch) -> None:
         "https://git.linecorp.com/arkdevelopers/code-review-agent/pull/59",
         fetch_evidence=True,
         env={"GHE_TOKEN": "ghe_unit_secret_value"},
-        http_get=lambda url, *, headers: None,
+        http_get=_unused_http_get,
     )
 
     assert report.overall_status == "needs_attention"
@@ -157,7 +166,7 @@ def test_scan_pr_fetch_mode_integrates_static_findings_and_context_metadata(
         "https://github.com/example/repo/pull/17",
         fetch_evidence=True,
         env={"GITHUB_TOKEN": "github_unit_secret_value"},
-        http_get=lambda url, *, headers: None,
+        http_get=_unused_http_get,
     )
 
     finding_ids = {finding.id for finding in report.findings}
@@ -238,7 +247,7 @@ def test_scan_pr_fetch_mode_with_workspace_adds_blast_radius_context(
         fetch_evidence=True,
         local_workspace_path=tmp_path,
         env={"GITHUB_TOKEN": "github_unit_secret_value"},
-        http_get=lambda url, *, headers: None,
+        http_get=_unused_http_get,
     )
 
     assert report.evaluation_metadata["blast_radius_context_grade"] == "review_grade"
@@ -291,7 +300,7 @@ def test_scan_pr_fetch_mode_without_workspace_marks_blast_radius_unavailable(
         "https://github.com/example/repo/pull/17",
         fetch_evidence=True,
         env={"GITHUB_TOKEN": "github_unit_secret_value"},
-        http_get=lambda url, *, headers: None,
+        http_get=_unused_http_get,
     )
 
     assert report.evaluation_metadata["context_grade"] == "review_grade"
@@ -341,7 +350,7 @@ def test_scan_pr_fetch_mode_with_missing_workspace_does_not_claim_review_grade(
         fetch_evidence=True,
         local_workspace_path=tmp_path / "missing-workspace",
         env={"GITHUB_TOKEN": "github_unit_secret_value"},
-        http_get=lambda url, *, headers: None,
+        http_get=_unused_http_get,
     )
 
     assert report.evaluation_metadata["blast_radius_context_grade"] == "unavailable"

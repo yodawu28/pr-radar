@@ -1,5 +1,6 @@
 from pr_radar.contracts import (
     ChangedFileMetadata,
+    GitHubChangedFileStatus,
     PrEvidencePack,
     PrInput,
     PrMetadata,
@@ -15,7 +16,7 @@ def _evidence_pack(
     path: str,
     diff: str,
     file_contents: dict[str, str] | None = None,
-    status: str = "modified",
+    status: GitHubChangedFileStatus = "modified",
 ) -> PrEvidencePack:
     return PrEvidencePack(
         pr_input=PrInput(

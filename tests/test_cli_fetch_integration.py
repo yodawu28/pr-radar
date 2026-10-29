@@ -4,6 +4,7 @@ from urllib.error import URLError
 from typer.testing import CliRunner
 
 import pr_radar.cli as cli
+import pr_radar.adapters.cli.evaluation as eval_cli
 from pr_radar.contracts import (
     CommitMetadata,
     FetchFailure,
@@ -13,6 +14,9 @@ from pr_radar.contracts import (
     RawEvidence,
     Report,
 )
+from pr_radar.evaluation.contracts import RunManifest
+from pr_radar.evaluation.metrics import summarize_metrics
+from pr_radar.evaluation.runner import EvaluationRunResult
 from pr_radar.github_adapter import GitHubEvidenceFetchError
 
 
@@ -223,3 +227,162 @@ def test_scan_fetch_enabled_accepts_local_workspace_path_option(
         "fetch_evidence": True,
         "local_workspace_path": tmp_path,
     }
+
+
+def test_eval_command_delegates_to_runner_and_artifact_writer(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    """Catches eval CLI adapters doing benchmark work inline."""
+    manifest_path = tmp_path / "cases.yaml"
+    manifest_path.write_text("cases: []\n")
+    output_dir = tmp_path / "outputs"
+    result = EvaluationRunResult(
+        case_results=(),
+        metrics=summarize_metrics(case_results=()),
+    )
+    captured: dict[str, object] = {}
+
+    def fake_run_evaluation_suite_or_exit(
+        path,
+        *,
+        scan_case,
+    ) -> EvaluationRunResult:
+        captured["manifest_path"] = path
+        captured["scan_case_name"] = scan_case.__name__
+        return result
+
+    def fake_write_evaluation_artifacts(
+        *,
+        output_dir,
+        result,
+        run_manifest,
+    ):
+        captured["output_dir"] = output_dir
+        captured["result"] = result
+        captured["run_manifest"] = run_manifest
+
+        class Written:
+            artifact_paths = (
+                output_dir / "eval-summary.md",
+                output_dir / "eval-results.json",
+                output_dir / "run-manifest.json",
+            )
+
+        return Written()
+
+    monkeypatch.setattr(
+        eval_cli,
+        "run_evaluation_suite_or_exit",
+        fake_run_evaluation_suite_or_exit,
+    )
+    monkeypatch.setattr(
+        eval_cli,
+        "write_evaluation_artifacts",
+        fake_write_evaluation_artifacts,
+    )
+
+    command_result = CliRunner().invoke(
+        cli.app,
+        ["eval", str(manifest_path), "--output-dir", str(output_dir)],
+    )
+
+    assert command_result.exit_code == 0
+    assert "eval-summary.md" in command_result.output
+    assert captured["manifest_path"] == manifest_path
+    assert captured["scan_case_name"] == "_unavailable_eval_scan_case"
+    assert captured["output_dir"] == output_dir
+    assert captured["result"] == result
+    assert isinstance(captured["run_manifest"], RunManifest)
+
+
+def test_eval_command_run_manifest_uses_content_free_artifact_names(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    """Absolute output directories must not be persisted into run manifests."""
+    manifest_path = tmp_path / "cases.yaml"
+    manifest_path.write_text("cases: []\n")
+    output_dir = tmp_path / "private" / "repo" / "evaluation" / "outputs"
+    result = EvaluationRunResult(
+        case_results=(),
+        metrics=summarize_metrics(case_results=()),
+    )
+    captured: dict[str, object] = {}
+
+    def fake_run_evaluation_suite_or_exit(
+        path,
+        *,
+        scan_case,
+    ) -> EvaluationRunResult:
+        return result
+
+    def fake_write_evaluation_artifacts(
+        *,
+        output_dir,
+        result,
+        run_manifest,
+    ):
+        captured["run_manifest"] = run_manifest
+
+        class Written:
+            artifact_paths = (
+                output_dir / "eval-summary.md",
+                output_dir / "eval-results.json",
+                output_dir / "run-manifest.json",
+            )
+
+        return Written()
+
+    monkeypatch.setattr(
+        eval_cli,
+        "run_evaluation_suite_or_exit",
+        fake_run_evaluation_suite_or_exit,
+    )
+    monkeypatch.setattr(
+        eval_cli,
+        "write_evaluation_artifacts",
+        fake_write_evaluation_artifacts,
+    )
+
+    command_result = CliRunner().invoke(
+        cli.app,
+        ["eval", str(manifest_path), "--output-dir", str(output_dir)],
+    )
+
+    assert command_result.exit_code == 0
+    run_manifest = captured["run_manifest"]
+    assert isinstance(run_manifest, RunManifest)
+    assert run_manifest.artifact_paths == (
+        "eval-summary.md",
+        "eval-results.json",
+        "run-manifest.json",
+    )
+    assert str(tmp_path) not in "\n".join(run_manifest.artifact_paths)
+
+
+def test_eval_command_invalid_suite_exits_non_zero_without_traceback(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    """Invalid eval config must fail closed without artifact writing."""
+    manifest_path = tmp_path / "cases.yaml"
+    manifest_path.write_text("cases: []\n")
+
+    def fake_run_evaluation_suite_or_exit(*args, **kwargs):
+        raise SystemExit(2)
+
+    def fail_write_artifacts(*args, **kwargs):
+        raise AssertionError("artifacts must not be written for invalid suite")
+
+    monkeypatch.setattr(
+        eval_cli,
+        "run_evaluation_suite_or_exit",
+        fake_run_evaluation_suite_or_exit,
+    )
+    monkeypatch.setattr(eval_cli, "write_evaluation_artifacts", fail_write_artifacts)
+
+    result = CliRunner().invoke(cli.app, ["eval", str(manifest_path)])
+
+    assert result.exit_code == 2
+    assert "Traceback" not in result.output

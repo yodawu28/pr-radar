@@ -52,9 +52,9 @@ def test_render_text_report_labels_low_confidence_findings() -> None:
         status="warning",
         score=55,
         confidence=0.42,
-        evidence_refs=["tests/test_service.py:12"],
+        evidence_refs=("tests/test_service.py:12",),
         decision_source="deterministic",
-        tags=[LOW_CONFIDENCE_TAG],
+        tags=(LOW_CONFIDENCE_TAG,),
     )
     report = Report(
         overall_status="needs_attention",
@@ -66,8 +66,8 @@ def test_render_text_report_labels_low_confidence_findings() -> None:
             url="https://github.com/example/repo/pull/17",
         ),
         ai_signal_summary="Possible AI-assisted changes, evidence is weak.",
-        findings=[low_confidence_finding],
-        low_confidence_findings=[low_confidence_finding],
+        findings=(low_confidence_finding,),
+        low_confidence_findings=(low_confidence_finding,),
     )
 
     rendered = render_text_report(report)
@@ -88,9 +88,9 @@ def test_render_text_report_keeps_unknown_pillar_findings_visible() -> None:
         status="high",
         score=82,
         confidence=0.73,
-        evidence_refs=["src/future.py:9"],
+        evidence_refs=("src/future.py:9",),
         decision_source="deterministic",
-        tags=[],
+        tags=(),
     )
     report = Report(
         overall_status="high_risk",
@@ -102,7 +102,7 @@ def test_render_text_report_keeps_unknown_pillar_findings_visible() -> None:
             url="https://github.com/example/repo/pull/17",
         ),
         ai_signal_summary="No AI-generation evidence collected yet.",
-        findings=[unknown_pillar_finding],
+        findings=(unknown_pillar_finding,),
     )
 
     rendered = render_text_report(report)
@@ -143,9 +143,9 @@ def test_render_text_report_includes_redacted_finding_excerpts() -> None:
         status="warning",
         score=66,
         confidence=0.68,
-        evidence_refs=["file:tests/test_payments.py", "diff:tests/test_payments.py"],
+        evidence_refs=("file:tests/test_payments.py", "diff:tests/test_payments.py"),
         decision_source="deterministic",
-        redacted_excerpts=[
+        redacted_excerpts=(
             RedactedExcerpt(
                 evidence_ref=EvidenceReference(
                     kind="diff",
@@ -153,7 +153,7 @@ def test_render_text_report_includes_redacted_finding_excerpts() -> None:
                 ),
                 text='+@pytest.mark.skip(reason="flaky api_key=sk_live_123456")',
             ),
-        ],
+        ),
     )
     report = Report(
         overall_status="needs_attention",
@@ -165,7 +165,7 @@ def test_render_text_report_includes_redacted_finding_excerpts() -> None:
             url="https://github.com/example/repo/pull/17",
         ),
         ai_signal_summary="No AI-generation evidence detected.",
-        findings=[finding],
+        findings=(finding,),
     )
 
     rendered = render_text_report(report)

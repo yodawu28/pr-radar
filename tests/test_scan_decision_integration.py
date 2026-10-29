@@ -1,5 +1,6 @@
 from collections.abc import Mapping
 
+from pr_radar.adapters.github.http import GitHubHttpResponse
 from pr_radar.contracts import (
     ChangedFileMetadata,
     PrEvidencePack,
@@ -8,6 +9,14 @@ from pr_radar.contracts import (
     RawEvidence,
 )
 from pr_radar.scan import scan_pr
+
+
+def _unused_http_get(
+    url: str,
+    *,
+    headers: Mapping[str, str] | None = None,
+) -> GitHubHttpResponse:
+    raise AssertionError(f"http_get should not be called in scan fixture: {url}")
 
 
 def _changed_file(path: str, diff: str) -> ChangedFileMetadata:
@@ -66,7 +75,7 @@ def test_review_grade_scan_attaches_risk_decision(monkeypatch) -> None:
         "https://github.com/example/repo/pull/17",
         fetch_evidence=True,
         env={"GITHUB_TOKEN": "github_unit_secret_value"},
-        http_get=lambda url, *, headers: None,
+        http_get=_unused_http_get,
     )
 
     assert report.overall_status == "needs_attention"

@@ -1,5 +1,6 @@
 from pr_radar.contracts import (
     ChangedFileMetadata,
+    GitHubChangedFileStatus,
     LOW_CONFIDENCE_TAG,
     PrEvidencePack,
     PrInput,
@@ -11,7 +12,11 @@ from pr_radar.detectors.test_integrity.test_shape import detect_test_shape_risks
 from pr_radar.privacy.redaction import MAX_REDACTED_EXCERPT_LENGTH
 
 
-def _changed_file(path: str, diff: str, status: str = "modified") -> ChangedFileMetadata:
+def _changed_file(
+    path: str,
+    diff: str,
+    status: GitHubChangedFileStatus = "modified",
+) -> ChangedFileMetadata:
     return ChangedFileMetadata(
         path=path,
         status=status,

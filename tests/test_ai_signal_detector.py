@@ -179,13 +179,13 @@ def test_detect_ai_signals_keeps_repo_markers_weak_and_visible() -> None:
     assert all(finding.decision_source == "deterministic" for finding in findings)
     assert all(finding.tags == (LOW_CONFIDENCE_TAG,) for finding in findings)
     assert {
-        evidence_ref
+        (evidence_ref.kind, evidence_ref.ref)
         for finding in findings
         for evidence_ref in finding.evidence_refs
     } == {
-        EvidenceReference(kind="repo_file", ref="file:.agents/skills/reviewer.md"),
-        EvidenceReference(kind="repo_file", ref="file:AGENTS.md"),
-        EvidenceReference(kind="repo_file", ref="file:CLAUDE.md"),
+        ("repo_file", "file:.agents/skills/reviewer.md"),
+        ("repo_file", "file:AGENTS.md"),
+        ("repo_file", "file:CLAUDE.md"),
     }
 
 

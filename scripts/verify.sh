@@ -70,6 +70,7 @@ require_contains "pyproject.toml" "license = \"MIT\""
 require_contains "pyproject.toml" "requires-python = \">=3\\.11\""
 require_contains "pyproject.toml" "pr-radar = \"pr_radar\\.cli:app\""
 
+uv run pyright src tests
 uv run pytest
 uv run pr-radar --help >/dev/null
 uv run pr-radar scan "https://github.com/example/repo/pull/1" >/dev/null

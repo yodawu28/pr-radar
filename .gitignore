@@ -12,3 +12,5 @@ DECISION.md
 DECISIONS.md
 PROGRESS.md
 docs/
+evaluation/outputs/
+evaluation/bench/cases/private/

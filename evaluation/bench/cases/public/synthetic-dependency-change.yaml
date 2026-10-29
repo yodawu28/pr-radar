@@ -1,0 +1,21 @@
+cases:
+  - case_id: public-synthetic-dependency-change
+    source_format: synthetic_replay
+    pr_id: public:synthetic/dependency-change#1
+    stack: python
+    ruleset_version: synthetic-v1
+    labels:
+      - public
+      - synthetic
+      - dependency
+    source_refs:
+      - sample-manifest.yaml:sha256:publiccase001
+    expected_findings:
+      - finding_id: expected:public.synthetic.dependency_added
+        pillar: security_supply_chain
+        reason_code: dependency_added_manifest_requires_supply_chain_review
+        evidence_path: pyproject.toml
+        severity: high_risk
+        source_rule_id: public.synthetic.dependency_added
+        source_line: 1
+        source_excerpt_hash: sha256:publicexcerpt001

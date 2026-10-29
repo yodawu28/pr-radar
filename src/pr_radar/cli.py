@@ -39,3 +39,18 @@ def scan(
         raise typer.Exit(code=1) from error
 
     typer.echo(render_text_report(report))
+
+
+@app.command("eval")
+def eval_suite(
+    manifest_path: Path,
+    output_dir: Path = typer.Option(
+        Path("evaluation/outputs"),
+        "--output-dir",
+        help="Write content-free evaluation artifacts to this directory.",
+    ),
+) -> None:
+    """Run an evaluation manifest and write content-free artifacts."""
+    from pr_radar.adapters.cli.evaluation import eval_suite as run_eval_suite
+
+    run_eval_suite(manifest_path=manifest_path, output_dir=output_dir)

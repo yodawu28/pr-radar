@@ -1,7 +1,9 @@
 import ast
 from collections.abc import Iterable
+import importlib
 from importlib.util import find_spec
 from pathlib import Path
+import sys
 
 
 PROJECT_ROOT = Path(__file__).parents[1]
@@ -9,6 +11,7 @@ SRC_ROOT = PROJECT_ROOT / "src" / "pr_radar"
 
 TARGET_PACKAGES = (
     "pr_radar.application",
+    "pr_radar.evaluation",
     "pr_radar.pull_requests",
     "pr_radar.privacy",
     "pr_radar.review",
@@ -51,6 +54,115 @@ def test_review_package_owns_decision_behavior_without_detector_imports() -> Non
         imported
         for imported in review_imports
         if imported.startswith("pr_radar.application")
+    }
+
+
+def test_scan_and_review_runtime_do_not_depend_on_evaluation() -> None:
+    """Catches Sprint 5 benchmark code leaking into runtime scan/review paths."""
+    runtime_paths = (
+        SRC_ROOT / "application",
+        SRC_ROOT / "review",
+        SRC_ROOT / "scan.py",
+        SRC_ROOT / "cli.py",
+    )
+    violations = {
+        str(path.relative_to(PROJECT_ROOT)): sorted(
+            imported
+            for imported in _module_imports(path)
+            if imported.startswith("pr_radar.evaluation")
+        )
+        for path in _iter_python_modules(runtime_paths)
+    }
+
+    assert {path: imports for path, imports in violations.items() if imports} == {}
+
+
+def test_cli_import_does_not_eagerly_load_evaluation_runtime() -> None:
+    """Catches transitive evaluation imports leaking into scan CLI startup."""
+    target_modules = tuple(
+        module_name
+        for module_name in sys.modules
+        if (
+            module_name == "pr_radar.cli"
+            or module_name == "pr_radar.adapters.cli"
+            or module_name == "pr_radar.adapters.cli.evaluation"
+            or module_name.startswith("pr_radar.evaluation")
+        )
+    )
+    saved_modules = {
+        module_name: sys.modules[module_name] for module_name in target_modules
+    }
+    try:
+        for module_name in target_modules:
+            del sys.modules[module_name]
+
+        importlib.import_module("pr_radar.cli")
+
+        loaded_evaluation_modules = tuple(
+            sorted(
+                module_name
+                for module_name in sys.modules
+                if module_name == "pr_radar.adapters.cli.evaluation"
+                or module_name.startswith("pr_radar.evaluation")
+            ),
+        )
+        assert loaded_evaluation_modules == ()
+    finally:
+        for module_name in tuple(sys.modules):
+            if (
+                module_name == "pr_radar.cli"
+                or module_name == "pr_radar.adapters.cli"
+                or module_name == "pr_radar.adapters.cli.evaluation"
+                or module_name.startswith("pr_radar.evaluation")
+            ):
+                del sys.modules[module_name]
+        sys.modules.update(saved_modules)
+
+
+def test_eval_cli_adapter_lives_under_adapters_package() -> None:
+    """Catches CLI adapter code drifting into the root package."""
+    assert not (SRC_ROOT / "eval_cli.py").exists()
+    assert (SRC_ROOT / "adapters" / "cli" / "evaluation.py").exists()
+
+    syntax_tree = _module_syntax_tree("src/pr_radar/cli.py")
+    imported_names = {
+        (node.module, alias.name)
+        for node in ast.walk(syntax_tree)
+        if isinstance(node, ast.ImportFrom) and node.module is not None
+        for alias in node.names
+    }
+
+    assert ("pr_radar.adapters.cli.evaluation", "eval_suite") in imported_names
+    assert ("pr_radar.eval_cli", "eval_suite") not in imported_names
+
+
+def test_evaluation_manifest_loader_uses_local_file_adapter() -> None:
+    """Catches file parsing logic drifting back into the evaluation domain."""
+    syntax_tree = _module_syntax_tree("src/pr_radar/evaluation/manifest_loader.py")
+    imported_names = {
+        (node.module, alias.name)
+        for node in syntax_tree.body
+        if isinstance(node, ast.ImportFrom) and node.module is not None
+        for alias in node.names
+    }
+
+    assert (
+        "pr_radar.adapters.local_files.structured_records",
+        "load_structured_records",
+    ) in imported_names
+
+
+def test_local_file_adapter_does_not_import_evaluation_domain() -> None:
+    """Keeps reusable structured record parsing independent of evaluation."""
+    adapter_path = SRC_ROOT / "adapters" / "local_files" / "structured_records.py"
+    assert adapter_path.exists()
+
+    imports = _module_imports(adapter_path)
+
+    assert not {
+        imported
+        for imported in imports
+        if imported.startswith("pr_radar.evaluation")
     }
 
 
@@ -190,6 +302,14 @@ def _module_imports(path: Path) -> set[str]:
         for imported in imports
         if imported == "pr_radar" or imported.startswith("pr_radar.")
     }
+
+
+def _iter_python_modules(paths: tuple[Path, ...]) -> Iterable[Path]:
+    for path in paths:
+        if path.is_file():
+            yield path
+        else:
+            yield from sorted(path.rglob("*.py"))
 
 
 def _find_cycles(graph: dict[str, set[str]]) -> Iterable[tuple[str, ...]]:

@@ -6,11 +6,20 @@ from typing import get_type_hints
 import pytest
 from pydantic import ValidationError
 
+from pr_radar.adapters.github.http import GitHubHttpResponse
 from pr_radar.contracts import PrEvidencePack, PrInput, PrMetadata, RawEvidence
 from pr_radar.scan import scan_pr
 
 
 PROJECT_ROOT = Path(__file__).parents[1]
+
+
+def _unused_http_get(
+    url: str,
+    *,
+    headers: Mapping[str, str] | None = None,
+) -> GitHubHttpResponse:
+    raise AssertionError(f"http_get should not be called in scan fixture: {url}")
 
 
 def _module(module_name: str):
@@ -70,7 +79,7 @@ def test_scan_policy_defaults_are_internal_and_drive_fetch_options(
         fetch_evidence=True,
         scan_policy=custom_policy,
         env={"GITHUB_TOKEN": "github_unit_secret_value"},
-        http_get=lambda url, *, headers: None,
+        http_get=_unused_http_get,
     )
 
     assert captured_include_file_contents == [False]

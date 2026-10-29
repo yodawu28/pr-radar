@@ -30,6 +30,10 @@ Goals:
 - Score severity and report inclusion without overriding deterministic failures.
 - Preserve low-confidence findings in the report.
 - Evaluate findings against curated ground-truth repositories by finding ID.
+- Sprint 5.0 baseline: public synthetic case only, 1 case, 0 evaluated,
+  1 unavailable because the scan adapter unavailable path is still explicit.
+  This is an aggregate measurement checkpoint and does not publish raw private
+  benchmark data.
 
 Current Sprint 4 output:
 - Local reports include a `Decision Recommendation` section.
